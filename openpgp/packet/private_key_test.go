@@ -13,10 +13,13 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/hex"
+	"fmt"
 	"hash"
 	"io"
 	"testing"
 	"time"
+
+	"golang.org/x/crypto/ed25519"
 )
 
 var privateKeyTests = []struct {
@@ -141,6 +144,65 @@ func TestECDSAPrivateKey(t *testing.T) {
 
 	sig := &Signature{
 		PubKeyAlgo: PubKeyAlgoECDSA,
+		Hash:       crypto.SHA256,
+	}
+	msg := []byte("Hello World!")
+
+	h, err := populateHash(sig.Hash, msg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := sig.Sign(h, priv, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	if h, err = populateHash(sig.Hash, msg); err != nil {
+		t.Fatal(err)
+	}
+	if err := priv.VerifySignature(h, sig); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestEDDSAPrivateKey(t *testing.T) {
+	_seed := "Hello World, I'm gonna be your seed during this test, would you?"
+	var seed = bytes.NewBuffer([]byte(_seed))
+	_, eddsaPriv, err := ed25519.GenerateKey(seed)
+	pointer := ed25519.PrivateKey(eddsaPriv)
+
+	var buf bytes.Buffer
+	eddsaPrivateKey := NewEDDSAPrivateKey(time.Now(), &pointer)
+	if err := eddsaPrivateKey.Serialize(&buf); err != nil {
+		t.Fatal(err)
+	}
+
+	p, err := Read(&buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	priv, ok := p.(*PrivateKey)
+	if !ok {
+		t.Fatal("didn't parse private key")
+	}
+
+	public := priv.PublicKey
+	fmt.Println("Public Key info:")
+	var bufPublicHexData = new(bytes.Buffer)
+	if err := public.Serialize(bufPublicHexData); err != nil {
+		t.Fatal(err)
+	}
+
+	fmt.Println("\thexData: ", hex.EncodeToString(bufPublicHexData.Bytes()))
+	fmt.Println("\thexFingerprint:", hex.EncodeToString(public.Fingerprint[:]))
+	fmt.Printf("\tcreationTime: %x\n", public.CreationTime.Unix())
+	fmt.Println("\tPubKeyAlgo: ", public.PubKeyAlgo)
+	fmt.Printf("\tkeyId: %x\n", public.KeyId)
+	fmt.Printf("\tkeyIdString: %s\n", public.KeyIdString())
+	fmt.Printf("\tkeyIdShort: %s\n", public.KeyIdShortString())
+
+	sig := &Signature{
+		PubKeyAlgo: PubKeyAlgoEDDSA,
 		Hash:       crypto.SHA256,
 	}
 	msg := []byte("Hello World!")
