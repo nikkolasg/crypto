@@ -201,6 +201,15 @@ func TestEDDSAPrivateKey(t *testing.T) {
 	fmt.Printf("\tkeyIdString: %s\n", public.KeyIdString())
 	fmt.Printf("\tkeyIdShort: %s\n", public.KeyIdShortString())
 
+	eddsaPublicKey := eddsaPrivateKey.PublicKey
+	var bufPublic bytes.Buffer
+	if err := eddsaPublicKey.Serialize(&bufPublic); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Read(&bufPublic); err != nil {
+		t.Fatal(err)
+	}
+
 	sig := &Signature{
 		PubKeyAlgo: PubKeyAlgoEDDSA,
 		Hash:       crypto.SHA256,

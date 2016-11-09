@@ -179,3 +179,16 @@ func Verify(publicKey PublicKey, message, sig []byte) bool {
 	R.ToBytes(&checkR)
 	return subtle.ConstantTimeCompare(sig[:32], checkR[:]) == 1
 }
+
+func (p *PublicKey) Valid() bool {
+	if len(*p) != PublicKeySize {
+		return false
+	}
+	var pubBytes [32]byte
+	copy(pubBytes[:], []byte(*p)[:])
+	var A edwards25519.ExtendedGroupElement
+	if !A.FromBytes(&pubBytes) {
+		return false
+	}
+	return true
+}

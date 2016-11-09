@@ -11,10 +11,11 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/des"
-	"golang.org/x/crypto/cast5"
-	"golang.org/x/crypto/openpgp/errors"
 	"io"
 	"math/big"
+
+	"golang.org/x/crypto/cast5"
+	"golang.org/x/crypto/openpgp/errors"
 )
 
 // readFull is the same as io.ReadFull except that reading zero bytes returns
@@ -318,6 +319,9 @@ func Read(r io.Reader) (p Packet, err error) {
 	if err != nil {
 		return
 	}
+	/*b, _ = ioutil.ReadAll(contents)*/
+	//fmt.Println("packet.Read() ReadAll AFTER: ", hex.EncodeToString(b))
+	//_, _, contents, _ = readHeader(bytes.NewReader(b))
 
 	switch tag {
 	case packetTypeEncryptedKey:
@@ -412,6 +416,8 @@ const (
 	// RFC 6637, Section 5.
 	PubKeyAlgoECDH  PublicKeyAlgorithm = 18
 	PubKeyAlgoECDSA PublicKeyAlgorithm = 19
+	// Draft https://tools.ietf.org/html/draft-ietf-openpgp-rfc4880bis-00#section-9.1
+	PubKeyAlgoEDDSA PublicKeyAlgorithm = 22
 )
 
 // CanEncrypt returns true if it's possible to encrypt a message to a public
@@ -428,7 +434,7 @@ func (pka PublicKeyAlgorithm) CanEncrypt() bool {
 // sign a message.
 func (pka PublicKeyAlgorithm) CanSign() bool {
 	switch pka {
-	case PubKeyAlgoRSA, PubKeyAlgoRSASignOnly, PubKeyAlgoDSA, PubKeyAlgoECDSA:
+	case PubKeyAlgoRSA, PubKeyAlgoRSASignOnly, PubKeyAlgoDSA, PubKeyAlgoECDSA, PubKeyAlgoEDDSA:
 		return true
 	}
 	return false

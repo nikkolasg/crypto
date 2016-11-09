@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"time"
 
+	"golang.org/x/crypto/ed25519"
 	"golang.org/x/crypto/openpgp/errors"
 	"golang.org/x/crypto/openpgp/s2k"
 )
@@ -45,6 +46,7 @@ type Signature struct {
 	RSASignature         parsedMPI
 	DSASigR, DSASigS     parsedMPI
 	ECDSASigR, ECDSASigS parsedMPI
+	EDDSASigR, EDDSASigS parsedMPI
 
 	// rawSubpackets contains the unparsed subpackets, in order.
 	rawSubpackets []outputSubpacket
@@ -98,7 +100,7 @@ func (sig *Signature) parse(r io.Reader) (err error) {
 	sig.SigType = SignatureType(buf[0])
 	sig.PubKeyAlgo = PublicKeyAlgorithm(buf[1])
 	switch sig.PubKeyAlgo {
-	case PubKeyAlgoRSA, PubKeyAlgoRSASignOnly, PubKeyAlgoDSA, PubKeyAlgoECDSA:
+	case PubKeyAlgoRSA, PubKeyAlgoRSASignOnly, PubKeyAlgoDSA, PubKeyAlgoECDSA, PubKeyAlgoEDDSA:
 	default:
 		err = errors.UnsupportedError("public key algorithm " + strconv.Itoa(int(sig.PubKeyAlgo)))
 		return
@@ -166,6 +168,11 @@ func (sig *Signature) parse(r io.Reader) (err error) {
 		sig.ECDSASigR.bytes, sig.ECDSASigR.bitLength, err = readMPI(r)
 		if err == nil {
 			sig.ECDSASigS.bytes, sig.ECDSASigS.bitLength, err = readMPI(r)
+		}
+	case PubKeyAlgoEDDSA:
+		sig.EDDSASigR.bytes, sig.EDDSASigR.bitLength, err = readMPI(r)
+		if err == nil {
+			sig.EDDSASigS.bytes, sig.EDDSASigS.bitLength, err = readMPI(r)
 		}
 	default:
 		panic("unreachable")
@@ -550,6 +557,17 @@ func (sig *Signature) Sign(h hash.Hash, priv *PrivateKey, config *Config) (err e
 		if err == nil {
 			sig.ECDSASigR = fromBig(r)
 			sig.ECDSASigS = fromBig(s)
+		}
+
+	case PubKeyAlgoEDDSA:
+		if pk, ok := priv.PrivateKey.(*ed25519.PrivateKey); ok {
+			buff := ed25519.Sign(*pk, digest)
+			//fmt.Println("ed25519.Sign():")
+			//fmt.Println("\tPrivate Key: ", hex.EncodeToString(*pk))
+			//fmt.Println("\tMessage    : ", hex.EncodeToString(digest))
+			//fmt.Println("\tSignature  : ", hex.EncodeToString(buff))
+			sig.EDDSASigR = parsedMPI{buff[:32], 32}
+			sig.EDDSASigS = parsedMPI{buff[32:], 32}
 		}
 	default:
 		err = errors.UnsupportedError("public key algorithm: " + strconv.Itoa(int(sig.PubKeyAlgo)))
