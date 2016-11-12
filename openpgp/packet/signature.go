@@ -618,7 +618,7 @@ func (sig *Signature) Serialize(w io.Writer) (err error) {
 	if len(sig.outSubpackets) == 0 {
 		sig.outSubpackets = sig.rawSubpackets
 	}
-	if sig.RSASignature.bytes == nil && sig.DSASigR.bytes == nil && sig.ECDSASigR.bytes == nil {
+	if sig.RSASignature.bytes == nil && sig.DSASigR.bytes == nil && sig.ECDSASigR.bytes == nil && sig.EDDSASigR.bytes == nil {
 		return errors.InvalidArgumentError("Signature: need to call Sign, SignUserId or SignKey before Serialize")
 	}
 
@@ -632,6 +632,9 @@ func (sig *Signature) Serialize(w io.Writer) (err error) {
 	case PubKeyAlgoECDSA:
 		sigLength = 2 + len(sig.ECDSASigR.bytes)
 		sigLength += 2 + len(sig.ECDSASigS.bytes)
+	case PubKeyAlgoEDDSA:
+		sigLength = 2 + len(sig.EDDSASigR.bytes)
+		sigLength += 2 + len(sig.EDDSASigS.bytes)
 	default:
 		panic("impossible")
 	}
@@ -671,6 +674,8 @@ func (sig *Signature) Serialize(w io.Writer) (err error) {
 		err = writeMPIs(w, sig.DSASigR, sig.DSASigS)
 	case PubKeyAlgoECDSA:
 		err = writeMPIs(w, sig.ECDSASigR, sig.ECDSASigS)
+	case PubKeyAlgoEDDSA:
+		err = writeMPIs(w, sig.EDDSASigR, sig.EDDSASigS)
 	default:
 		panic("impossible")
 	}
