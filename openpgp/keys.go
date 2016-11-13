@@ -9,6 +9,7 @@ import (
 	"io"
 	"time"
 
+	"golang.org/x/crypto/ed25519"
 	"golang.org/x/crypto/openpgp/armor"
 	"golang.org/x/crypto/openpgp/errors"
 	"golang.org/x/crypto/openpgp/packet"
@@ -335,7 +336,6 @@ func ReadEntity(packets *packet.Reader) (*Entity, error) {
 	if !e.PrimaryKey.PubKeyAlgo.CanSign() {
 		return nil, errors.StructuralError("primary key cannot be used for signatures")
 	}
-
 	var current *Identity
 	var revocations []*packet.Signature
 EachPacket:
@@ -456,6 +456,43 @@ func addSubkey(e *Entity, packets *packet.Reader, pub *packet.PublicKey, priv *p
 }
 
 const defaultRSAKeyBits = 2048
+
+func NewEDDSAEntity(name, comment, email string, config *packet.Config) (*Entity, error) {
+	currentTime := config.Now()
+
+	uid := packet.NewUserId(name, comment, email)
+	if uid == nil {
+		return nil, errors.InvalidArgumentError("user id field contained invalid characters")
+	}
+	signingPub, signingPriv, err := ed25519.GenerateKey(config.Random())
+	if err != nil {
+		return nil, err
+	}
+	castedPriv := ed25519.PrivateKey(signingPriv)
+	castedPub := ed25519.PublicKey(signingPub)
+	e := &Entity{
+		PrimaryKey: packet.NewEDDSAPublicKey(currentTime, &castedPub),
+		PrivateKey: packet.NewEDDSAPrivateKey(currentTime, &castedPriv),
+		Identities: make(map[string]*Identity),
+	}
+	isPrimaryId := true
+	e.Identities[uid.Id] = &Identity{
+		Name:   uid.Name,
+		UserId: uid,
+		SelfSignature: &packet.Signature{
+			CreationTime: currentTime,
+			SigType:      packet.SigTypePositiveCert,
+			PubKeyAlgo:   packet.PubKeyAlgoEDDSA,
+			Hash:         config.Hash(),
+			IsPrimaryId:  &isPrimaryId,
+			FlagsValid:   true,
+			FlagSign:     true,
+			FlagCertify:  true,
+			IssuerKeyId:  &e.PrimaryKey.KeyId,
+		},
+	}
+	return e, nil
+}
 
 // NewEntity returns an Entity that contains a fresh RSA/RSA keypair with a
 // single identity composed of the given full name, comment and email, any of

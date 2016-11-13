@@ -34,7 +34,7 @@ var (
 	oidCurveP384 []byte = []byte{0x2B, 0x81, 0x04, 0x00, 0x22}
 	// NIST curve P-521
 	oidCurveP521 []byte = []byte{0x2B, 0x81, 0x04, 0x00, 0x23}
-	// DJB Ed25519 Curve
+	// Ed25519 Curve
 	oidCurveEd25519 []byte = []byte{0x2B, 0x06, 0x01, 0x04, 0x01, 0xDA, 0x47, 0x0F, 0x01}
 )
 
@@ -50,7 +50,6 @@ type ecdsaKey struct {
 }
 
 // eddsaKey stores the algorithm-specific fields for EDDSA keys.
-// XXX Only oidCurveEd25519 is supported
 type eddsaKey struct {
 	// same structure as an ecdsaKey
 	*ecdsaKey
@@ -83,9 +82,6 @@ func (f *ecdsaKey) parse(r io.Reader) (err error) {
 		return err
 	}
 	f.p.bytes, f.p.bitLength, err = readMPI(r)
-	//numBytes := (int(f.p.bitLength) + 7) / 8
-	//fmt.Println("publickey.parse() OID", hex.EncodeToString(f.oid))
-	//fmt.Println("publickey.parse() length = ", f.p.bitLength, "| byteLen = ", numBytes, ",len(point) = ", len(f.p.bytes), " point", hex.EncodeToString(f.p.bytes), err)
 	return
 }
 
@@ -108,7 +104,7 @@ func (f *ecdsaKey) newECDSA() (*ecdsa.PublicKey, error) {
 	} else if bytes.Equal(f.oid, oidCurveP521) {
 		c = elliptic.P521()
 	} else {
-		return nil, errors.UnsupportedError(fmt.Sprintf("unsupported oid: %x", f.oid))
+		return nil, errors.UnsupportedError("unsupported oid")
 	}
 	x, y := elliptic.Unmarshal(c, f.p.bytes)
 	if x == nil {
@@ -129,9 +125,11 @@ func (e *eddsaKey) newEDDSA() (*ed25519.PublicKey, error) {
 	}
 
 	key := ed25519.PublicKey(point)
-	if !key.Valid() {
+	if len([]byte(key)) != ed25519.PublicKeySize {
 		return nil, errors.ErrKeyIncorrect
 	}
+	// TODO should we test the validity of the point with
+	// ExtendedGroupElement.FromBytes() ?
 	return &key, nil
 }
 
@@ -610,10 +608,6 @@ func (pk *PublicKey) VerifySignature(signed hash.Hash, sig *Signature) (err erro
 		var eddsaSig [ed25519.SignatureSize]byte
 		copy(eddsaSig[:32], sig.EDDSASigR.bytes)
 		copy(eddsaSig[32:], sig.EDDSASigS.bytes)
-		//fmt.Println("EDDSA.Verify():")
-		//fmt.Println("\tPublic Key: ", hex.EncodeToString(*eddsaPublicKey))
-		//fmt.Println("\tMessage   : ", hex.EncodeToString(hashBytes))
-		//fmt.Println("\tSignature : ", hex.EncodeToString(eddsaSig[:]))
 		if !ed25519.Verify(*eddsaPublicKey, hashBytes, eddsaSig[:]) {
 			return errors.SignatureError("EDDSA verification failure")
 		}

@@ -74,7 +74,7 @@ func NewEDDSAPrivateKey(currentTime time.Time, priv *ed25519.PrivateKey) *Privat
 }
 
 // NewSignerPrivateKey creates a sign-only PrivateKey from a crypto.Signer that
-// implements RSA or ECDSA.
+// implements RSA or ECDSA or EDDSA.
 func NewSignerPrivateKey(currentTime time.Time, signer crypto.Signer) *PrivateKey {
 	pk := new(PrivateKey)
 	switch pubkey := signer.Public().(type) {
@@ -83,6 +83,8 @@ func NewSignerPrivateKey(currentTime time.Time, signer crypto.Signer) *PrivateKe
 		pk.PubKeyAlgo = PubKeyAlgoRSASignOnly
 	case ecdsa.PublicKey:
 		pk.PublicKey = *NewECDSAPublicKey(currentTime, &pubkey)
+	case ed25519.PublicKey:
+		pk.PublicKey = *NewEDDSAPublicKey(currentTime, &pubkey)
 	default:
 		panic("openpgp: unknown crypto.Signer type in NewSignerPrivateKey")
 	}

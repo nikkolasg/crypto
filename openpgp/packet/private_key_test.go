@@ -13,7 +13,6 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/hex"
-	"fmt"
 	"hash"
 	"io"
 	"testing"
@@ -164,50 +163,28 @@ func TestECDSAPrivateKey(t *testing.T) {
 	}
 }
 
+type eddsaSigner struct {
+	priv *ed25519.PrivateKey
+}
+
+func (s *eddsaSigner) Public() crypto.PublicKey {
+	return ed25519.PublicKey(*s.priv)[32:]
+}
+
+func (s *eddsaSigner) Sign(rand io.Reader, msg []byte, opts crypto.SignerOpts) ([]byte, error) {
+	return s.priv.Sign(rand, msg, opts)
+}
+
 func TestEDDSAPrivateKey(t *testing.T) {
 	_seed := "Hello World, I'm gonna be your seed during this test, would you?"
 	var seed = bytes.NewBuffer([]byte(_seed))
 	_, eddsaPriv, err := ed25519.GenerateKey(seed)
 	pointer := ed25519.PrivateKey(eddsaPriv)
 
-	var buf bytes.Buffer
-	eddsaPrivateKey := NewEDDSAPrivateKey(time.Now(), &pointer)
-	if err := eddsaPrivateKey.Serialize(&buf); err != nil {
-		t.Fatal(err)
-	}
+	eddsaPrivateKey := NewSignerPrivateKey(time.Now(), &eddsaSigner{&pointer})
 
-	p, err := Read(&buf)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	priv, ok := p.(*PrivateKey)
-	if !ok {
-		t.Fatal("didn't parse private key")
-	}
-
-	public := priv.PublicKey
-	fmt.Println("Public Key info:")
-	var bufPublicHexData = new(bytes.Buffer)
-	if err := public.Serialize(bufPublicHexData); err != nil {
-		t.Fatal(err)
-	}
-
-	fmt.Println("\thexData: ", hex.EncodeToString(bufPublicHexData.Bytes()))
-	fmt.Println("\thexFingerprint:", hex.EncodeToString(public.Fingerprint[:]))
-	fmt.Printf("\tcreationTime: %x\n", public.CreationTime.Unix())
-	fmt.Println("\tPubKeyAlgo: ", public.PubKeyAlgo)
-	fmt.Printf("\tkeyId: %x\n", public.KeyId)
-	fmt.Printf("\tkeyIdString: %s\n", public.KeyIdString())
-	fmt.Printf("\tkeyIdShort: %s\n", public.KeyIdShortString())
-
-	eddsaPublicKey := eddsaPrivateKey.PublicKey
-	var bufPublic bytes.Buffer
-	if err := eddsaPublicKey.Serialize(&bufPublic); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := Read(&bufPublic); err != nil {
-		t.Fatal(err)
+	if eddsaPrivateKey.PubKeyAlgo != PubKeyAlgoEDDSA {
+		t.Fatal("NewSignerPrivateKey should have made a ECSDA private key")
 	}
 
 	sig := &Signature{
@@ -220,14 +197,14 @@ func TestEDDSAPrivateKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := sig.Sign(h, priv, nil); err != nil {
+	if err := sig.Sign(h, eddsaPrivateKey, nil); err != nil {
 		t.Fatal(err)
 	}
 
 	if h, err = populateHash(sig.Hash, msg); err != nil {
 		t.Fatal(err)
 	}
-	if err := priv.VerifySignature(h, sig); err != nil {
+	if err := eddsaPrivateKey.VerifySignature(h, sig); err != nil {
 		t.Fatal(err)
 	}
 }

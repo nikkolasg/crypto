@@ -562,18 +562,28 @@ func (sig *Signature) Sign(h hash.Hash, priv *PrivateKey, config *Config) (err e
 	case PubKeyAlgoEDDSA:
 		if pk, ok := priv.PrivateKey.(*ed25519.PrivateKey); ok {
 			buff := ed25519.Sign(*pk, digest)
-			//fmt.Println("ed25519.Sign():")
-			//fmt.Println("\tPrivate Key: ", hex.EncodeToString(*pk))
-			//fmt.Println("\tMessage    : ", hex.EncodeToString(digest))
-			//fmt.Println("\tSignature  : ", hex.EncodeToString(buff))
-			sig.EDDSASigR = parsedMPI{buff[:32], 32}
-			sig.EDDSASigS = parsedMPI{buff[32:], 32}
+			sig.EDDSASigR = parsedMPI{buff[:32], 256}
+			sig.EDDSASigS = parsedMPI{buff[32:], 256}
+		} else {
+			var b []byte
+			b, err = priv.PrivateKey.(crypto.Signer).Sign(config.Random(), digest, new(eddsaSignerOpts))
+			if err == nil {
+				sig.EDDSASigR = parsedMPI{b[:32], 256}
+				sig.EDDSASigS = parsedMPI{b[32:], 256}
+			}
 		}
 	default:
 		err = errors.UnsupportedError("public key algorithm: " + strconv.Itoa(int(sig.PubKeyAlgo)))
 	}
 
 	return
+}
+
+type eddsaSignerOpts struct{}
+
+// compatibility with ed25519, although there should not be...
+func (e eddsaSignerOpts) HashFunc() crypto.Hash {
+	return 0
 }
 
 // unwrapECDSASig parses the two integer components of an ASN.1-encoded ECDSA

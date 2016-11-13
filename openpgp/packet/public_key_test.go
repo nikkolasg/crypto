@@ -27,7 +27,7 @@ var pubKeyTests = []struct {
 }
 
 func TestPublicKeyRead(t *testing.T) {
-	for i, test := range pubKeyTests[3:] {
+	for i, test := range pubKeyTests {
 		packet, err := Read(readerFromHex(test.hexData))
 		if err != nil {
 			t.Errorf("#%d: Read error: %s", i, err)

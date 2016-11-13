@@ -319,9 +319,6 @@ func Read(r io.Reader) (p Packet, err error) {
 	if err != nil {
 		return
 	}
-	/*b, _ = ioutil.ReadAll(contents)*/
-	//fmt.Println("packet.Read() ReadAll AFTER: ", hex.EncodeToString(b))
-	//_, _, contents, _ = readHeader(bytes.NewReader(b))
 
 	switch tag {
 	case packetTypeEncryptedKey:
